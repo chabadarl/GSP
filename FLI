@@ -1,0 +1,131 @@
+
+//
+
+
+
+FUNCTION FLI_Circulization {
+  PARAMETER AltitudeTarget,
+            marginError,
+            AutoStage.
+
+  // Initialisation of operator check if Dv is enough and put ship in known config
+
+  if SHIP:APOAPSIS < AltitudeTarget - marginError {
+    // create operation to push periapsis to AltitudeTarget
+    if not FLI_PushPeriapsis(AltitudeTarget,marginError,AutoStage){
+      set positionCirculaire to 1.
+      return FALSE.
+    }
+  }
+  if SHIP:APOAPSIS < AltitudeTarget + marginError and SHIP:PERIAPSIS < AltitudeTarget - marginError  {
+    // create operation to push periapsis to AltitudeTarget
+    if not FLI_PushPeriapsis(AltitudeTarget,marginError,AutoStage){
+      set positionCirculaire to 2.
+      return FALSE.
+    }
+  }else {
+    if SHIP:PERIAPSIS < AltitudeTarget - marginError  {
+      // create operation to push periapsis to AltitudeTarget
+      if not FLI_PushPeriapsis(AltitudeTarget,marginError,AutoStage){
+        set positionCirculaire to 3.
+        return FALSE.
+      }
+    }else if SHIP:PERIAPSIS > AltitudeTarget - marginError  {
+      // create operation to pull periapsis to AltitudeTarget
+      if not FLI_PushPeriapsis(AltitudeTarget,marginError,AutoStage){
+        set positionCirculaire to 4.
+        return FALSE.
+      }
+    }
+    // create operation to pull apoapsis to AltitudeTarget
+    if FLI_PushApoapsis(AltitudeTarget,marginError,AutoStage){
+      set positionCirculaire to 5.
+      return FALSE.
+    }
+  }
+  return true.
+}
+
+FUNCTION FLI_PushPeriapsis {
+  PARAMETER AltitudeTarget,
+            marginError,
+            AutoStage.
+  set v1 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:APOAPSIS +SHIP:ORBIT:BODY:RADIUS)-1/SHIP:ORBIT:SEMIMAJORAXIS)).
+  set v2 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:APOAPSIS +SHIP:ORBIT:BODY:RADIUS)-1/(2*SHIP:ORBIT:BODY:RADIUS+SHIP:APOAPSIS+AltitudeTarget))).
+  set MyNode to NODE(TIME:SECONDS+ETA:APOAPSIS,0,0,v2-v1).
+  MAN_ExecuteNode(MyNode,AutoStage).
+}
+
+FUNCTION FLI_PushApoapsis {
+  PARAMETER AltitudeTarget,
+            marginError,
+            AutoStage.
+  set v1 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:PERIAPSIS +SHIP:ORBIT:BODY:RADIUS)-1/SHIP:ORBIT:SEMIMAJORAXIS)).
+  set v2 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:PERIAPSIS +SHIP:ORBIT:BODY:RADIUS)-1/(2*SHIP:ORBIT:BODY:RADIUS+SHIP:PERIAPSIS+AltitudeTarget))).
+  set MyNode to NODE(TIME:SECONDS+ETA:PERIAPSIS,0,0,v2-v1).
+  MAN_ExecuteNode(MyNode,AutoStage).
+}
+
+FUNCTION FLI_SynchronizeOrbit {
+  PARAMETER TargetSynchro,
+            AngleSynchro,
+            AltitudeSyncro.
+  if marginAngle=0 {set marginAngle to 0.1.}
+  if marginError=0 {set marginError to 1.}
+
+  set Syncro to true.
+
+  if ALTITUDE > AltitudeSyncro+marginError
+    or ALTITUDE < AltitudeSyncro+marginError
+    or ORB_DiffAng(SHIPNAME,TargetSynchro) > AngleSynchro + marginAngle
+    or ORB_DiffAng(SHIPNAME,TargetSynchro) < AngleSynchro - marginAngle {
+    set Syncro to false.
+  }
+
+  if not Syncro {
+    set targetOrb to ORBITABLE(TargetSynchro).
+    set AngleToStart to MOD(AngleSynchro-2*constant:pi*sqrt((2*body:radius+altitude+targetOrb:ALTITUDE)^3/mu)+360,360).
+    set startAngle to ORB_DiffAng(SHIPNAME,TargetSynchro).
+    set Syncro to true.
+    set startTime to time.
+
+    if ORB_DiffAng(SHIPNAME,TargetSynchro) >= AngleToStart + marginAngle
+      or ORB_DiffAng(SHIPNAME,TargetSynchro) <= AngleToStart - marginAngle {
+      set v1 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:PERIAPSIS + SHIP:ORBIT:BODY:RADIUS)-1/SHIP:ORBIT:SEMIMAJORAXIS)).
+      set v2 to sqrt(SHIP:ORBIT:BODY:MU * (2 /(SHIP:PERIAPSIS + SHIP:ORBIT:BODY:RADIUS)-1/(2*SHIP:ORBIT:BODY:RADIUS + SHIP:PERIAPSIS + targetOrb:ALTITUDE))).
+      set MyNode to NODE(TIME:SECONDS + 30,0,0,v2-v1).
+      MAN_ExecuteNode(MyNode,true).
+    }
+  }
+}​​
+
+FUNCTION FLI_ExecuteNode {
+ PARAMETER MyNode,
+           AutoStage.
+   if MyNode:istype("NODE") {
+                 set n to MyNode.
+   } else{
+     set n to NEXTNODE.
+   }
+
+   set v to n:BURNVECTOR.
+   set startTime to TIME:SECONDS + n:ETA - Time4Man(v:MAG)/2.
+
+  if  n:ETA - Time4Man(v:MAG)/2 < 60 {
+
+   set actualSteer to STEERING.
+   LOCK STEERING TO n:BURNVECTOR.
+   MAN_Staging(FALSE).
+
+    UNTIL VDOT(n:BURNVECTOR, v) < 0 {
+       MAN_Staging(AutoStage).
+       LOCK THROTTLE TO MIN(0.9*MAN_Time4Man(n:BURNVECTOR:MAG), 1).
+     }
+   LOCK THROTTLE TO 0.
+   LOCK STEERING to actualSteer.
+   return TRUE.
+   }
+   return FALSE.
+}
+
+set FLIisCharged to true.

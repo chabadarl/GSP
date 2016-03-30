@@ -1,0 +1,54 @@
+
+
+FUNCTION ORBITABLE {
+  PARAMETER name.
+  LIST TARGETS in vessels.
+  FOR vs IN vessels {
+    IF vs:NAME = name {
+      RETURN VESSEL(name).
+    }
+  }
+  RETURN BODY(name).
+}
+
+FUNCTION ORB_DiffAng{
+ Parameter Orbital1,
+           Orbital2.
+ RETURN MOD(ORBITAL(Orbital1):Longitude-ORBITAL(Orbital2):Longitude+360,360).
+}
+
+// Time to complete a maneuver
+FUNCTION ORB_Time4Man {
+  PARAMETER dv.
+  local ens is list().
+  ens:clear.
+  local ens_thrust is 0.
+  local ens_isp is 0.
+  list engines in myengines.
+
+  for en in myengines {
+    if en:ignition = true and en:flameout = false {
+      ens:add(en).
+    }
+  }
+
+  for en in ens {
+    local ens_thrust is ens_thrust + en:availablethrust.
+    local ens_isp is ens_isp + en:isp.
+  }
+
+  if ens_thrust = 0 or ens_isp = 0 {
+    notify("No engines available!").
+    return 0.
+  }
+  else {
+    local f is ens_thrust * 1000.  // engine thrust (kg * m/s²)
+    local m is ship:mass * 1000.        // starting mass (kg)
+    local e is constant():e.            // base of natural log
+    local p is ens_isp/ens:length.               // engine isp (s) support to average different isp values
+    local g is ship:orbit:body:mu/ship:obt:body:radius^2.    // gravitational acceleration constant (m/s²)
+    return g * m * p * (1 - e^(-dv/(g*p))) / f.
+  }
+}
+
+set ORBisCharged to true.

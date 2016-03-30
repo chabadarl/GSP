@@ -1,0 +1,101 @@
+
+/// if GTO still exist run it to takeoff
+
+
+Notify(SHIP:STATUS).
+if SHIP:STATUS ="PRELAUNCH"{
+  if transfert("flightplan",1,1,1) {
+    run flightplan.
+    delete "flightplan".
+  }
+}
+
+
+if SHIP:STATUS ="ORBITING"  {
+  clearscreen.
+  set target to vessel("Podster's Scrap").
+  lock relvel to target:velocity:orbit-ship:velocity:orbit.
+  wait 10.
+
+  set prevThrust to maxthrust.
+  set speed to min(200,target:distance/40).
+  set minrelvel to 15.
+
+  function killrelvelocity{
+    parameter mission.
+    waitDA(relvel).
+    lock throttle to min(1,relvel:mag/maxthrust).
+    lock steering to relvel.
+
+    if relvel:mag < minrelvel {
+      print "exiting killrel" at (10,12).
+      lock throttle to 0.
+      set minrelvel to max(1,minrelvel*0.5).
+      lock steering to target:position.
+      if target:distance < 500 mission["terminate"]().
+      waitDA(target:position).
+      mission["switch_to"]("gotarget").
+    }
+  }
+
+  function waitMinDist{
+    parameter mission.
+    set target to vessel("Podster's Scrap").
+    set lastDistance to target:distance.
+    wait 1.
+    if  target:distance> lastDistance or target:distance< { set warp to 0. mission["switch_to"]("killrelvelocity"). }
+  }
+
+
+  function gotarget{
+    parameter mission.
+    waitDA(target:position).
+    lock throttle to min(1,(speed-relvel:mag)/maxthrust).
+    set target to vessel("Podster's Scrap").
+    lock steering to target:position.
+    set speed to min(200,target:distance/40).
+    if relvel:mag > speed {
+      print "exiting gotarget" at (10,12).
+      lock throttle to 0.
+      lock steering to relvel.
+      waitDA(relvel).
+      mission["switch_to"]("waitMinDist").
+    }
+  }
+
+  set main_sequence2 to list(
+    "waitMinDist", waitMinDist@,
+    "killrelvelocity", killrelvelocity@,
+    "gotarget", gotarget@
+  ).
+
+  function Stage_check {
+    parameter mission.
+    set target to vessel("Podster's Scrap").
+    EVE_Staging(true).
+  }
+  function printpours {
+    parameter mission.
+    set target to vessel("Podster's Scrap").
+
+    print "relvel:mag   " + round(relvel:mag,1) at (5,5).
+    print "min relve    " + round(minrelvel,2)  at (5,6).
+    print "max relv     " + round(speed,2) at (5,7).
+    print "runmode      " + mission["runmode"]() + "     " at (5,8).
+    print "vdot         " + round(vdot(target:position,relvel),2) at (5,9).
+    print "maxthrust    "  +round(relvel:mag/maxthrust,2) at (5,10).
+
+  }
+  set events2 to lex(
+    "Stage Check", Stage_check@,
+    "print", printpours@
+  ).
+
+function waitDA{
+  parameter vector.
+
+  lock steering TO vector.
+  wait until vang(ship:facing:forevector, vector) < 2.
+}
+  run_mission(main_sequence2,events2).
+}

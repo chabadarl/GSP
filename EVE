@@ -1,0 +1,41 @@
+set prevThrust to MAXTHRUST.
+// Check if the ship needs to stage
+FUNCTION EVE_Staging {
+  PARAMETER AutoStage.
+
+  IF MAXTHRUST < (prevThrust - 10) {
+    IF AutoStage{
+      SET currentThrottle TO THROTTLE.
+      LOCK THROTTLE TO 0.
+      WAIT 1. STAGE. WAIT 1.
+      LOCK THROTTLE TO currentThrottle.
+    }
+    SET prevThrust TO MAXTHRUST.
+    RETURN TRUE.
+  }
+  IF MAXTHRUST > prevThrust{SET prevThrust TO MAXTHRUST.}
+  RETURN FALSE.
+}
+
+
+//Check if the ship can optimize Enlightment
+FUNCTION EVE_EnlightmentOptim{
+  lock steering to heading(0,0).
+}
+
+//Check if ship can open antenna
+FUNCTION EVE_telco{
+  function hasAntenna{
+    parameter part.
+    for m in part:modules{ if m="ModuleRTAntenna" return true.}
+    return false.
+  }
+  set antenna to enum["select"](ship:parts,hasAntenna@).
+  for ant in antenna {
+    if ant:getmodule("ModuleRTAntenna"):getfield("status")="off"{
+      ant:getmodule("ModuleRTAntenna"):doevent("activate").
+    }
+    ant:getmodule("ModuleRTAntenna"):setfield("target","mission-control").
+  }
+}
+set EVEisCharged to true.

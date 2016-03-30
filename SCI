@@ -1,0 +1,12 @@
+
+
+
+FUNCTION SCI_DoScience(){
+brakes.
+  SET antenna TO SHIP:PARTSDUBBED("SCANsat").
+  FOR ant IN antenna {
+  ant:GETMODULE("SCANsat"):DOEVENT("Start RADAR").
+
+}
+
+set SCIisCharged to true.

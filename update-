@@ -1,0 +1,27 @@
+//update-ship
+
+//   update-OrbitSaver2000
+
+if transfert ( "Xmain-" + ship:name,0,1,1){
+  transfert ("main",1,1,0).
+  rename  "Xmain-" + ship:name TO  "main".
+}
+
+
+if transfert ("Xflightplan-" + ship:name,0,1,1){
+  transfert ("flightplan",1,1,0).
+  rename "Xflightplan-" + ship:name TO  flightplan.
+}
+
+
+transfert("ENU",0,1,1).
+transfert("EVE",0,1,1).
+transfert("MRS",0,1,1).
+
+set SatNet to "SatNet-Omnisat".
+if SatNet <>""{
+  if transfert (Satnet,0,1,1){
+    transfert ("SatNet",1,1,0).
+    rename Satnet to "SatNet".
+  }
+}
